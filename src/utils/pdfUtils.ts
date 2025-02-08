@@ -86,9 +86,9 @@ async function getStudentData(npm: string, isAslab: boolean): Promise<StudentDat
 
 export async function getCertificatePage(npm: string, isAslab: boolean): Promise<{ blob: Blob | null; filename: string }> {
   try {
-    console.log('Starting certificate generation for NPM:', npm, 'isAslab:', isAslab); // Debug log
+    console.log('Starting certificate generation for NPM:', npm, 'isAslab:', isAslab);
     const studentData = await getStudentData(npm, isAslab);
-    console.log('Student data for certificate:', studentData); // Debug log
+    console.log('Student data for certificate:', studentData);
     
     if (studentData === null) {
       throw new Error('Student not found in list');
@@ -99,7 +99,7 @@ export async function getCertificatePage(npm: string, isAslab: boolean): Promise
       ? '/data/cert/c3rt_a.pdf'
       : '/data/cert/c3rt_p.pdf';
 
-    console.log('Attempting to fetch PDF from:', pdfPath); // Debug log
+    console.log('Attempting to fetch PDF from:', pdfPath);
     const pdfResponse = await fetch(pdfPath);
     if (!pdfResponse.ok) {
       throw new Error(`Failed to fetch PDF: ${pdfResponse.statusText} (${pdfResponse.status})`);
@@ -108,27 +108,31 @@ export async function getCertificatePage(npm: string, isAslab: boolean): Promise
     const pdfBytes = await pdfResponse.arrayBuffer();
     const pdfDoc = await PDFDocument.load(pdfBytes);
     
-    console.log(`Total PDF pages: ${pdfDoc.getPageCount()}`);
+    const pageCount = pdfDoc.getPageCount();
+    console.log(`Total PDF pages: ${pageCount}`);
     console.log(`Attempting to get page ${studentData.number} (Student number: ${studentData.number + 1})`);
 
-    if (studentData.number >= pdfDoc.getPageCount()) {
-      throw new Error(`Invalid page number: ${studentData.number}. PDF only has ${pdfDoc.getPageCount()} pages.`);
+    if (studentData.number >= pageCount) {
+      throw new Error(`Invalid page number: ${studentData.number}. PDF only has ${pageCount} pages.`);
     }
 
     // Create a new PDF with just the student's page
     const newPdf = await PDFDocument.create();
-    const [page] = await newPdf.copyPages(pdfDoc, [studentData.number]);
-    if (!page) {
+    const [copiedPage] = await newPdf.copyPages(pdfDoc, [studentData.number]);
+    
+    if (!copiedPage) {
       throw new Error('Failed to copy page from PDF');
     }
-    newPdf.addPage(page);
-
+    
+    newPdf.addPage(copiedPage);
+    
+    // Save the new PDF with just one page
     const newPdfBytes = await newPdf.save();
     const blob = new Blob([newPdfBytes], { type: 'application/pdf' });
     
     // Generate filename with the new format
     const filename = `Sertifikat PBO_X - ${studentData.name} - ${npm}.pdf`;
-    console.log('Generated filename:', filename); // Debug log
+    console.log('Generated filename:', filename);
     
     return { blob, filename };
   } catch (error) {

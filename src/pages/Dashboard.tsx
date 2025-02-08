@@ -131,13 +131,18 @@ export default function Dashboard() {
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', result.filename);
+      link.setAttribute('type', 'application/pdf');
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      setError('Gagal mengunduh sertifikat');
       console.error('Download error:', err);
+      if (err instanceof Error) {
+        setError(`Gagal mengunduh sertifikat: ${err.message}`);
+      } else {
+        setError('Gagal mengunduh sertifikat. Silakan coba lagi nanti.');
+      }
     } finally {
       setDownloading(false);
     }
