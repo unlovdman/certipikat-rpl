@@ -7,7 +7,13 @@ interface StudentEntry {
   NO?: number;
   no?: number;
   NAMA?: string;
+  Nama?: string;
   nama?: string;
+}
+
+interface StudentData {
+  number: number;
+  name: string;
 }
 
 async function readExcelFile(filePath: string): Promise<StudentEntry[]> {
@@ -24,59 +30,77 @@ async function readExcelFile(filePath: string): Promise<StudentEntry[]> {
   }
 }
 
-async function getStudentNumber(npm: string, isAslab: boolean): Promise<number | null> {
+async function getStudentData(npm: string, isAslab: boolean): Promise<StudentData | null> {
   try {
     const filePath = isAslab 
-      ? '/src/assets/list-aslab/Aslab PBO_X.xlsx'
-      : '/src/assets/list-praktikan-lulus/Praktikan Lulus PBO_X.xlsx';
+      ? '/data/p1/d4t4_x1_a.xlsx'
+      : '/data/p1/d4t4_x1_l.xlsx';
     
     const entries = await readExcelFile(filePath);
     const student = entries.find(entry => (entry.NPM || entry.npm) === npm);
     
+    console.log('Found student data:', student); // Debug log
+    
     if (student) {
-      return (student.NO || student.no || 1) - 1; // Convert to 0-based index
+      const studentData = {
+        number: (student.NO || student.no || 1) - 1,
+        name: (student.NAMA || student.Nama || student.nama || '').trim()
+      };
+      console.log('Processed student data:', studentData); // Debug log
+      return studentData;
     }
     return null;
   } catch (error) {
-    console.error('Error getting student number:', error);
+    console.error('Error getting student data:', error);
     return null;
   }
 }
 
-export async function getCertificatePage(npm: string, isAslab: boolean): Promise<Blob | null> {
+export async function getCertificatePage(npm: string, isAslab: boolean): Promise<{ blob: Blob | null; filename: string }> {
   try {
-    const studentNumber = await getStudentNumber(npm, isAslab);
+    const studentData = await getStudentData(npm, isAslab);
+    console.log('Student data for certificate:', studentData); // Debug log
     
-    if (studentNumber === null) {
+    if (studentData === null) {
       throw new Error('Student not found in list');
     }
 
     // Get the appropriate PDF file
     const pdfPath = isAslab
-      ? '/src/assets/sertifikat-aslab/All Sertifikat Aslab RPL.PBO.X.pdf'
-      : '/src/assets/sertifikat-praktikan/All Sertifikat Praktikan RPL.PBO.X.pdf';
+      ? '/data/cert/c3rt_a.pdf'
+      : '/data/cert/c3rt_p.pdf';
 
     const pdfResponse = await fetch(pdfPath);
+    if (!pdfResponse.ok) {
+      throw new Error(`Failed to fetch PDF: ${pdfResponse.statusText}`);
+    }
+    
     const pdfBytes = await pdfResponse.arrayBuffer();
     const pdfDoc = await PDFDocument.load(pdfBytes);
 
     // Create a new PDF with just the student's page
     const newPdf = await PDFDocument.create();
-    const [page] = await newPdf.copyPages(pdfDoc, [studentNumber]);
+    const [page] = await newPdf.copyPages(pdfDoc, [studentData.number]);
     newPdf.addPage(page);
 
     const newPdfBytes = await newPdf.save();
-    return new Blob([newPdfBytes], { type: 'application/pdf' });
+    const blob = new Blob([newPdfBytes], { type: 'application/pdf' });
+    
+    // Generate filename with the new format
+    const filename = `Sertifikat PBO_X - ${studentData.name} - ${npm}.pdf`;
+    console.log('Generated filename:', filename); // Debug log
+    
+    return { blob, filename };
   } catch (error) {
     console.error('Error getting certificate page:', error);
-    return null;
+    return { blob: null, filename: '' };
   }
 }
 
 // Function to get individual certificate URL
 export function getCertificateUrl(npm: string, isAslab: boolean): string {
   if (isAslab) {
-    return `/src/assets/sertifikat-aslab/Sertifikat_Aslab_${npm}.pdf`;
+    return `/data/cert/cert_a_${npm}.pdf`;
   }
-  return `/src/assets/sertifikat-praktikan/Sertifikat_${npm}.pdf`;
+  return `/data/cert/cert_p_${npm}.pdf`;
 } 

@@ -121,20 +121,19 @@ export default function Dashboard() {
       setDownloading(true);
       setError('');
       
-      const pdfBlob = await getCertificatePage(studentInfo.npm, studentInfo.isAslab);
+      const result = await getCertificatePage(studentInfo.npm, studentInfo.isAslab);
       
-      if (!pdfBlob) {
+      if (!result.blob) {
         throw new Error('Sertifikat tidak ditemukan');
       }
       
-      const url = window.URL.createObjectURL(pdfBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Sertifikat_${studentInfo.isAslab ? 'Aslab_' : ''}${studentInfo.npm}.pdf`;
-      a.setAttribute('aria-label', 'Unduh Sertifikat PDF');
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      const url = window.URL.createObjectURL(result.blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', result.filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
       window.URL.revokeObjectURL(url);
     } catch (err) {
       setError('Gagal mengunduh sertifikat');
