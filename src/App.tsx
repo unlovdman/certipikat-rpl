@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Landing from './pages/Landing';
+import Footer from './components/Footer';
 import { AuthProvider } from './contexts/AuthContext';
 import { initSecurity } from './utils/securityUtils';
 import './index.css';
@@ -263,6 +264,7 @@ function App() {
               <Route path="/dashboard" element={<Navigate to={ROUTES.PORTAL} replace />} />
               <Route path="*" element={<Navigate to={ROUTES.HOME} replace />} />
             </Routes>
+            <Footer />
           </div>
         </Router>
       </AuthProvider>

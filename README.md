@@ -6,7 +6,7 @@ A digital certificate management system for the Software Engineering Laboratory.
 
 - Secure login system using NPM (Student ID)
 - Check practicum status (Passed/Not Passed)
-- View Aslab (Lab Assistant) status
+- View User (Lab Assistant) status
 - Download digital certificates
 - Modern and responsive UI
 - Multiple practicum period support
@@ -30,17 +30,20 @@ A digital certificate management system for the Software Engineering Laboratory.
 ### Installation
 
 1. Clone the repository
+
 ```bash
-git clone https://github.com/yourusername/sertifikat-rpl.git
+git clone https://github.com/unlovdman/certipikat-rpl.git
 ```
 
 2. Install dependencies
+
 ```bash
 cd sertifikat-rpl
 npm install
 ```
 
 3. Start the development server
+
 ```bash
 npm run dev
 ```
@@ -84,3 +87,7 @@ src/
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+<div align="center">
+<sub><sup>『Mit Liebe erschaffen von unlovdman』</sup></sub>
+</div>
