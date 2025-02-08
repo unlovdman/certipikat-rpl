@@ -1,11 +1,8 @@
 import * as XLSX from 'xlsx';
-import { PDFDocument } from 'pdf-lib';
 
 interface StudentEntry {
   NPM?: string;
   npm?: string;
-  NO?: number;
-  no?: number;
   NAMA?: string;
   nama?: string;
 }
@@ -25,25 +22,6 @@ async function readExcelFile(filePath: string): Promise<StudentEntry[]> {
   } catch (error) {
     console.error('Error reading Excel file:', error);
     return [];
-  }
-}
-
-async function getStudentNumber(npm: string, isAslab: boolean): Promise<number | null> {
-  try {
-    const filePath = isAslab 
-      ? '/data/p1/d4t4_x1_a.xlsx'  // Aslab list
-      : '/data/p1/d4t4_x1_l.xlsx'; // Lulus list
-    
-    const entries = await readExcelFile(filePath);
-    const student = entries.find(entry => (entry.NPM || entry.npm) === npm);
-    
-    if (student) {
-      return (student.NO || student.no || 1) - 1; // Convert to 0-based index
-    }
-    return null;
-  } catch (error) {
-    console.error('Error getting student number:', error);
-    return null;
   }
 }
 
