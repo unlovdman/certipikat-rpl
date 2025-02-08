@@ -142,19 +142,32 @@ export default function Dashboard() {
       setError('');
       
       try {
-        // Create object URL
-        const url = window.URL.createObjectURL(result.blob);
-        
+        // For mobile, create a blob with the correct filename
         if (isMobile) {
-          // For mobile, try to open in same window first
-          window.location.href = url;
+          const file = new File([result.blob], result.filename, {
+            type: 'application/pdf'
+          });
           
-          // Clean up after navigation
+          const url = window.URL.createObjectURL(file);
+          
+          // Create and click a download link
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = result.filename;
+          link.type = 'application/pdf';
+          
+          // Try to trigger download
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          
+          // Clean up
           setTimeout(() => {
             window.URL.revokeObjectURL(url);
           }, 1000);
         } else {
           // Desktop download handling
+          const url = window.URL.createObjectURL(result.blob);
           const link = document.createElement('a');
           link.href = url;
           link.download = result.filename;
