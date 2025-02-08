@@ -122,7 +122,8 @@ export default function Dashboard() {
       setError('');
       
       // Show loading message for mobile
-      if (/Mobi|Android/i.test(navigator.userAgent)) {
+      const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+      if (isMobile) {
         setError('Mohon tunggu, sedang memproses sertifikat...');
       }
       
@@ -131,32 +132,46 @@ export default function Dashboard() {
       if (!result.blob) {
         throw new Error('Sertifikat tidak ditemukan');
       }
+
+      // Verify blob is valid
+      if (result.blob.size === 0) {
+        throw new Error('File sertifikat kosong');
+      }
       
       // Clear the loading message
       setError('');
       
-      // Create object URL
-      const url = window.URL.createObjectURL(result.blob);
-      
-      // Different handling for mobile
-      if (/Mobi|Android/i.test(navigator.userAgent)) {
-        // For mobile, open in new tab
-        window.open(url, '_blank');
+      try {
+        // Create object URL
+        const url = window.URL.createObjectURL(result.blob);
         
-        // Clean up after a delay
-        setTimeout(() => {
-          window.URL.revokeObjectURL(url);
-        }, 1000);
-      } else {
-        // Desktop download handling
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', result.filename);
-        link.setAttribute('type', 'application/pdf');
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        window.URL.revokeObjectURL(url);
+        if (isMobile) {
+          // For mobile, try to open in same window first
+          window.location.href = url;
+          
+          // Clean up after navigation
+          setTimeout(() => {
+            window.URL.revokeObjectURL(url);
+          }, 1000);
+        } else {
+          // Desktop download handling
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = result.filename;
+          link.type = 'application/pdf';
+          
+          // Try to trigger download
+          try {
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          } finally {
+            window.URL.revokeObjectURL(url);
+          }
+        }
+      } catch (downloadError) {
+        console.error('Download mechanics error:', downloadError);
+        throw new Error('Gagal mendownload file sertifikat');
       }
     } catch (err) {
       console.error('Download error:', err);

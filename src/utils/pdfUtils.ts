@@ -94,43 +94,64 @@ export async function getCertificatePage(npm: string, isAslab: boolean): Promise
       throw new Error('Data mahasiswa tidak ditemukan');
     }
 
-    // Get the appropriate PDF file
+    // Get the appropriate PDF file - use absolute path
     const pdfPath = isAslab
-      ? '/data/cert/c3rt_a.pdf'
-      : '/data/cert/c3rt_p.pdf';
+      ? './data/cert/c3rt_a.pdf'
+      : './data/cert/c3rt_p.pdf';
 
     console.log('Attempting to fetch PDF from:', pdfPath);
-    const pdfResponse = await fetch(pdfPath, {
-      cache: 'no-cache', // Disable caching to ensure fresh content
-      headers: {
-        'Accept': 'application/pdf'
+    let pdfResponse;
+    try {
+      pdfResponse = await fetch(pdfPath, {
+        method: 'GET',
+        cache: 'no-cache',
+        headers: {
+          'Accept': 'application/pdf',
+          'Content-Type': 'application/pdf'
+        }
+      });
+      
+      if (!pdfResponse.ok) {
+        console.error('PDF fetch failed:', {
+          status: pdfResponse.status,
+          statusText: pdfResponse.statusText,
+          path: pdfPath
+        });
+        throw new Error(`Gagal mengambil file sertifikat (${pdfResponse.status})`);
       }
-    });
-    
-    if (!pdfResponse.ok) {
-      console.error('PDF fetch failed:', pdfResponse.status, pdfResponse.statusText);
-      throw new Error('Gagal mengambil file sertifikat');
+    } catch (fetchError) {
+      console.error('Fetch error:', fetchError);
+      throw new Error('Gagal mengakses file sertifikat');
     }
-    
-    // Check if the response is empty
-    const contentLength = pdfResponse.headers.get('content-length');
-    if (contentLength && parseInt(contentLength) === 0) {
-      throw new Error('File sertifikat kosong');
+
+    // Verify we got a PDF response
+    const contentType = pdfResponse.headers.get('content-type');
+    if (!contentType || !contentType.includes('pdf')) {
+      console.error('Invalid content type:', contentType);
+      throw new Error('Format file sertifikat tidak valid');
     }
 
     try {
       const pdfBytes = await pdfResponse.arrayBuffer();
+      
       if (!pdfBytes || pdfBytes.byteLength === 0) {
+        console.error('Empty PDF file received');
         throw new Error('File sertifikat kosong');
       }
 
+      console.log('PDF file size:', pdfBytes.byteLength, 'bytes');
+
       const pdfDoc = await PDFDocument.load(pdfBytes, { 
-        updateMetadata: false // Optimize loading by skipping metadata
+        updateMetadata: false
       });
       
       const pageCount = pdfDoc.getPageCount();
       console.log(`Total PDF pages: ${pageCount}`);
       console.log(`Attempting to get page ${studentData.number} (Student number: ${studentData.number + 1})`);
+
+      if (pageCount === 0) {
+        throw new Error('File sertifikat tidak memiliki halaman');
+      }
 
       if (studentData.number >= pageCount) {
         throw new Error(`Halaman sertifikat tidak valid (${studentData.number + 1})`);
@@ -150,14 +171,25 @@ export async function getCertificatePage(npm: string, isAslab: boolean): Promise
       const newPdfBytes = await newPdf.save({
         useObjectStreams: true,
         addDefaultPage: false,
-        objectsPerTick: 50 // Process fewer objects per tick for better memory usage
+        objectsPerTick: 50
       });
       
-      const blob = new Blob([newPdfBytes], { type: 'application/pdf' });
+      if (!newPdfBytes || newPdfBytes.length === 0) {
+        throw new Error('Gagal membuat file sertifikat');
+      }
+
+      const blob = new Blob([newPdfBytes], { 
+        type: 'application/pdf'
+      });
       
+      if (blob.size === 0) {
+        throw new Error('File sertifikat hasil kosong');
+      }
+
       // Generate filename with the new format
       const filename = `Sertifikat PBO_X - ${studentData.name} - ${npm}.pdf`;
       console.log('Generated filename:', filename);
+      console.log('Final blob size:', blob.size, 'bytes');
       
       return { blob, filename };
     } catch (pdfError) {
