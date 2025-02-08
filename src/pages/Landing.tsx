@@ -5,8 +5,6 @@ import {
   Container,
   Typography,
   Grid,
-  useTheme,
-  useMediaQuery,
 } from '@mui/material';
 
 const ROUTES = {
@@ -15,8 +13,6 @@ const ROUTES = {
 
 export default function Landing() {
   const navigate = useNavigate();
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   return (
     <Box

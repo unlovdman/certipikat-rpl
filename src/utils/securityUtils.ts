@@ -22,18 +22,15 @@ const disableDevTools = () => {
   const aggressive = () => {
     // Check if dev tools is open
     const checkDevTools = () => {
-      const any = window.any || {};
       const isFF = /Firefox/i.test(navigator.userAgent);
       const isOpera = /Opera/i.test(navigator.userAgent);
       const widthThreshold = window.outerWidth - window.innerWidth > 100;
       const heightThreshold = window.outerHeight - window.innerHeight > 100;
-      const orientation = widthThreshold ? 'vertical' : 'horizontal';
 
       if (
-        window.Firebug?.chrome?.isInitialized ||
         widthThreshold ||
         heightThreshold ||
-        (isFF && any.bar) ||
+        isFF ||
         isOpera
       ) {
         if (!isDevToolsOpen) {

@@ -1,42 +1,47 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, ReactNode } from 'react';
 import { isAslab } from '../utils/excelUtils';
+import { getCurrentPeriod } from '../utils/excelUtils';
 
 interface AuthContextType {
-  isAuthenticated: boolean;
   npm: string | null;
+  isAuthenticated: boolean;
   login: (npm: string) => Promise<boolean>;
   logout: () => void;
-  isAslabUser: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [npm, setNpm] = useState<string | null>(null);
-  const [isAslabUser, setIsAslabUser] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const login = async (inputNpm: string) => {
     try {
-      const aslabStatus = await isAslab(inputNpm);
-      setIsAslabUser(aslabStatus);
-      setIsAuthenticated(true);
+      const currentPeriod = getCurrentPeriod();
+      const aslabStatus = await isAslab(inputNpm, 'PBO', currentPeriod);
+      
+      if (aslabStatus) {
+        setNpm(inputNpm);
+        setIsAuthenticated(true);
+        return true;
+      }
+
       setNpm(inputNpm);
+      setIsAuthenticated(true);
       return true;
     } catch (error) {
-      console.error('Error during login:', error);
+      console.error('Login error:', error);
       return false;
     }
   };
 
   const logout = () => {
-    setIsAuthenticated(false);
     setNpm(null);
-    setIsAslabUser(false);
+    setIsAuthenticated(false);
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, npm, login, logout, isAslabUser }}>
+    <AuthContext.Provider value={{ npm, isAuthenticated, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
