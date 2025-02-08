@@ -86,7 +86,7 @@ async function getStudentData(npm: string, isAslab: boolean): Promise<StudentDat
 
 export async function getCertificatePage(npm: string, isAslab: boolean): Promise<{ blob: Blob | null; filename: string }> {
   try {
-    console.log('Starting certificate generation for NPM:', npm, 'isAslab:', isAslab);
+    console.log('Starting certificate fetch for NPM:', npm, 'isAslab:', isAslab);
     const studentData = await getStudentData(npm, isAslab);
     console.log('Student data for certificate:', studentData);
     
@@ -94,20 +94,19 @@ export async function getCertificatePage(npm: string, isAslab: boolean): Promise
       throw new Error('Data mahasiswa tidak ditemukan');
     }
 
-    // Get the appropriate PDF file - use absolute path
+    // Get the pre-split PDF file path
+    const filename = `Sertifikat PBO_X - ${studentData.name} - ${npm}.pdf`;
     const pdfPath = isAslab
-      ? './data/cert/c3rt_a.pdf'
-      : './data/cert/c3rt_p.pdf';
+      ? `/data/cert/a/${filename}`  // Aslab certificates directory
+      : `/data/cert/p/${filename}`; // Praktikan certificates directory
 
     console.log('Attempting to fetch PDF from:', pdfPath);
-    let pdfResponse;
     try {
-      pdfResponse = await fetch(pdfPath, {
+      const pdfResponse = await fetch(pdfPath, {
         method: 'GET',
         cache: 'no-cache',
         headers: {
-          'Accept': 'application/pdf',
-          'Content-Type': 'application/pdf'
+          'Accept': 'application/pdf'
         }
       });
       
@@ -117,84 +116,20 @@ export async function getCertificatePage(npm: string, isAslab: boolean): Promise
           statusText: pdfResponse.statusText,
           path: pdfPath
         });
-        throw new Error(`Gagal mengambil file sertifikat (${pdfResponse.status})`);
+        throw new Error('Gagal mengambil file sertifikat');
       }
-    } catch (fetchError) {
-      console.error('Fetch error:', fetchError);
-      throw new Error('Gagal mengakses file sertifikat');
-    }
 
-    // Verify we got a PDF response
-    const contentType = pdfResponse.headers.get('content-type');
-    if (!contentType || !contentType.includes('pdf')) {
-      console.error('Invalid content type:', contentType);
-      throw new Error('Format file sertifikat tidak valid');
-    }
-
-    try {
-      const pdfBytes = await pdfResponse.arrayBuffer();
-      
-      if (!pdfBytes || pdfBytes.byteLength === 0) {
-        console.error('Empty PDF file received');
+      const pdfBlob = await pdfResponse.blob();
+      if (!pdfBlob || pdfBlob.size === 0) {
         throw new Error('File sertifikat kosong');
       }
 
-      console.log('PDF file size:', pdfBytes.byteLength, 'bytes');
-
-      const pdfDoc = await PDFDocument.load(pdfBytes, { 
-        updateMetadata: false
-      });
+      console.log('PDF file size:', pdfBlob.size, 'bytes');
+      return { blob: pdfBlob, filename };
       
-      const pageCount = pdfDoc.getPageCount();
-      console.log(`Total PDF pages: ${pageCount}`);
-      console.log(`Attempting to get page ${studentData.number} (Student number: ${studentData.number + 1})`);
-
-      if (pageCount === 0) {
-        throw new Error('File sertifikat tidak memiliki halaman');
-      }
-
-      if (studentData.number >= pageCount) {
-        throw new Error(`Halaman sertifikat tidak valid (${studentData.number + 1})`);
-      }
-
-      // Create a new PDF with just the student's page
-      const newPdf = await PDFDocument.create();
-      const [copiedPage] = await newPdf.copyPages(pdfDoc, [studentData.number]);
-      
-      if (!copiedPage) {
-        throw new Error('Gagal menyalin halaman sertifikat');
-      }
-      
-      newPdf.addPage(copiedPage);
-      
-      // Save with compression for smaller file size
-      const newPdfBytes = await newPdf.save({
-        useObjectStreams: true,
-        addDefaultPage: false,
-        objectsPerTick: 50
-      });
-      
-      if (!newPdfBytes || newPdfBytes.length === 0) {
-        throw new Error('Gagal membuat file sertifikat');
-      }
-
-      const blob = new Blob([newPdfBytes], { 
-        type: 'application/pdf'
-      });
-      
-      if (blob.size === 0) {
-        throw new Error('File sertifikat hasil kosong');
-      }
-
-      // Generate filename with the new format
-      const filename = `Sertifikat PBO_X - ${studentData.name} - ${npm}.pdf`;
-      console.log('Generated filename:', filename);
-      console.log('Final blob size:', blob.size, 'bytes');
-      
-      return { blob, filename };
-    } catch (pdfError) {
-      console.error('PDF processing error:', pdfError);
-      throw new Error('Gagal memproses sertifikat');
+    } catch (fetchError) {
+      console.error('Fetch error:', fetchError);
+      throw new Error('Gagal mengakses file sertifikat');
     }
   } catch (error) {
     console.error('Detailed error in getCertificatePage:', error);
@@ -209,7 +144,7 @@ export async function getCertificatePage(npm: string, isAslab: boolean): Promise
 // Function to get individual certificate URL
 export function getCertificateUrl(npm: string, isAslab: boolean): string {
   if (isAslab) {
-    return `/data/cert/cert_a_${npm}.pdf`;
+    return `/data/cert/a/cert_a_${npm}.pdf`;
   }
-  return `/data/cert/cert_p_${npm}.pdf`;
+  return `/data/cert/p/cert_p_${npm}.pdf`;
 } 
