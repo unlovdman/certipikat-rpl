@@ -38,7 +38,7 @@ interface PraktikumConfig {
 
 export class PraktikumNotAvailableError extends Error {
   constructor(praktikum: PraktikumType, period: PraktikumPeriod) {
-    super(`Praktikum ${praktikum} periode ${period} belum dilaksanakan`);
+    super(`Praktikum ${praktikum} periode ${period} belum dilaksanakan. Silakan cek kembali pada semester yang sesuai.`);
     this.name = 'PraktikumNotAvailableError';
   }
 }
@@ -70,6 +70,23 @@ export function getAvailablePeriods(praktikum: PraktikumType): PraktikumPeriod[]
   return Object.keys(PRAKTIKUM_PATHS[praktikum] || {}) as PraktikumPeriod[];
 }
 
+async function fetchAndReadExcel(path: string) {
+  try {
+    const response = await fetch(path);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    const workbook = XLSX.read(arrayBuffer);
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    return XLSX.utils.sheet_to_json<ExcelRow>(worksheet);
+  } catch (error) {
+    console.error('Error reading Excel file:', error);
+    throw error;
+  }
+}
+
 export async function checkStudentStatus(
   npm: string, 
   praktikum: PraktikumType,
@@ -81,40 +98,21 @@ export async function checkStudentStatus(
       throw new PraktikumNotAvailableError(praktikum, period);
     }
 
-    // First check in the list of students
     try {
-      const response = await fetch(paths.list);
-      if (!response.ok) {
-        throw new PraktikumNotAvailableError(praktikum, period);
-      }
-      const arrayBuffer = await response.arrayBuffer();
-      const workbook = XLSX.read(arrayBuffer);
-      
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      const data = XLSX.utils.sheet_to_json<ExcelRow>(worksheet);
-
+      // Get student data from main list
+      const data = await fetchAndReadExcel(paths.list);
       const student = data.find((row) => 
         String(row.NPM || row.npm || '').trim() === npm.trim()
       );
       
       if (student) {
-        // Check if the student is in the passed list
+        // Check if student has passed
         let isPassed = false;
         try {
-          const passedResponse = await fetch(paths.lulus);
-          if (passedResponse.ok) {
-            const passedArrayBuffer = await passedResponse.arrayBuffer();
-            const passedWorkbook = XLSX.read(passedArrayBuffer);
-            
-            const passedSheetName = passedWorkbook.SheetNames[0];
-            const passedWorksheet = passedWorkbook.Sheets[passedSheetName];
-            const passedData = XLSX.utils.sheet_to_json<ExcelRow>(passedWorksheet);
-
-            isPassed = passedData.some((row) => 
-              String(row.NPM || row.npm || '').trim() === npm.trim()
-            );
-          }
+          const passedData = await fetchAndReadExcel(paths.lulus);
+          isPassed = passedData.some((row) => 
+            String(row.NPM || row.npm || '').trim() === npm.trim()
+          );
         } catch (error) {
           console.error('Error checking passed status:', error);
           // Continue with isPassed as false
@@ -130,13 +128,14 @@ export async function checkStudentStatus(
 
       return null;
     } catch (error) {
+      console.error('Error reading Excel file:', error);
       if (error instanceof PraktikumNotAvailableError) {
         throw error;
       }
       throw new PraktikumNotAvailableError(praktikum, period);
     }
   } catch (error) {
-    console.error('Error reading Excel file:', error);
+    console.error('Error in checkStudentStatus:', error);
     throw error;
   }
 }
@@ -153,23 +152,13 @@ export async function isAslab(
     }
 
     try {
-      const response = await fetch(paths.aslab);
-      if (!response.ok) {
-        return false; // If aslab list is not available, assume not an aslab
-      }
-      const arrayBuffer = await response.arrayBuffer();
-      const workbook = XLSX.read(arrayBuffer);
-      
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      const data = XLSX.utils.sheet_to_json<ExcelRow>(worksheet);
-
+      const data = await fetchAndReadExcel(paths.aslab);
       return data.some((row) => 
         String(row.NPM || row.npm || '').trim() === npm.trim()
       );
     } catch (error) {
       console.error('Error checking aslab status:', error);
-      return false; // If there's an error reading aslab file, assume not an aslab
+      return false;
     }
   } catch (error) {
     console.error('Error in isAslab:', error);
