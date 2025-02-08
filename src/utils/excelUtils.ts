@@ -45,19 +45,20 @@ export class PraktikumNotAvailableError extends Error {
 
 const CURRENT_PERIOD: PraktikumPeriod = 'X';
 
+// Using obfuscated file names for security
 const PRAKTIKUM_PATHS: PraktikumConfig = {
   'PBO': {
     'X': {
-      list: '/src/assets/list-praktikan/Praktikan PBO_X.xlsx',
-      lulus: '/src/assets/list-praktikan-lulus/Praktikan Lulus PBO_X.xlsx',
-      aslab: '/src/assets/list-aslab/Aslab PBO_X.xlsx'
+      list: '/data/p1/d4t4_x1.xlsx',
+      lulus: '/data/p1/d4t4_x1_l.xlsx',
+      aslab: '/data/p1/d4t4_x1_a.xlsx'
     }
   },
   'Basis Data': {
     'X': {
-      list: '/src/assets/list-praktikan/Praktikan Basis Data_X.xlsx',
-      lulus: '/src/assets/list-praktikan-lulus/Praktikan Lulus Basis Data_X.xlsx',
-      aslab: '/src/assets/list-aslab/Aslab Basis Data_X.xlsx'
+      list: '/data/p2/d4t4_x2.xlsx',
+      lulus: '/data/p2/d4t4_x2_l.xlsx',
+      aslab: '/data/p2/d4t4_x2_a.xlsx'
     }
   }
 };
@@ -74,6 +75,7 @@ async function fetchAndReadExcel(path: string) {
   try {
     const response = await fetch(path);
     if (!response.ok) {
+      console.error('Failed to fetch file:', path, response.status, response.statusText);
       throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
     }
     const arrayBuffer = await response.arrayBuffer();

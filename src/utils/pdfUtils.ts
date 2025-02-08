@@ -13,6 +13,10 @@ interface StudentEntry {
 async function readExcelFile(filePath: string): Promise<StudentEntry[]> {
   try {
     const response = await fetch(filePath);
+    if (!response.ok) {
+      console.error('Failed to fetch Excel file:', filePath, response.status, response.statusText);
+      return [];
+    }
     const arrayBuffer = await response.arrayBuffer();
     const workbook = XLSX.read(arrayBuffer);
     const sheetName = workbook.SheetNames[0];
@@ -27,8 +31,8 @@ async function readExcelFile(filePath: string): Promise<StudentEntry[]> {
 async function getStudentNumber(npm: string, isAslab: boolean): Promise<number | null> {
   try {
     const filePath = isAslab 
-      ? '/src/assets/list-aslab/Aslab PBO_X.xlsx'
-      : '/src/assets/list-praktikan-lulus/Praktikan Lulus PBO_X.xlsx';
+      ? '/data/p1/d4t4_x1_a.xlsx'  // Aslab list
+      : '/data/p1/d4t4_x1_l.xlsx'; // Lulus list
     
     const entries = await readExcelFile(filePath);
     const student = entries.find(entry => (entry.NPM || entry.npm) === npm);
@@ -43,40 +47,46 @@ async function getStudentNumber(npm: string, isAslab: boolean): Promise<number |
   }
 }
 
+// PDF file paths with obfuscated names for security
+const PDF_PATHS = {
+  PRAKTIKAN: '/data/cert/c3rt_p.pdf',  // Certificate for regular students
+  ASLAB: '/data/cert/c3rt_a.pdf',      // Certificate for lab assistants
+  INDIVIDUAL: {
+    PRAKTIKAN: (npm: string) => `/data/cert/p/${npm}.pdf`,  // Individual praktikan certificates
+    ASLAB: (npm: string) => `/data/cert/a/${npm}.pdf`       // Individual aslab certificates
+  }
+};
+
 export async function getCertificatePage(npm: string, isAslab: boolean): Promise<Blob | null> {
   try {
-    const studentNumber = await getStudentNumber(npm, isAslab);
+    // First try to get individual certificate
+    const individualPath = isAslab 
+      ? PDF_PATHS.INDIVIDUAL.ASLAB(npm)
+      : PDF_PATHS.INDIVIDUAL.PRAKTIKAN(npm);
     
-    if (studentNumber === null) {
-      throw new Error('Student not found in list');
+    let response = await fetch(individualPath);
+    
+    // If individual certificate not found, fall back to the main certificate
+    if (!response.ok) {
+      const mainPath = isAslab ? PDF_PATHS.ASLAB : PDF_PATHS.PRAKTIKAN;
+      response = await fetch(mainPath);
+      
+      if (!response.ok) {
+        console.error('Failed to fetch PDF:', mainPath, response.status, response.statusText);
+        return null;
+      }
     }
-
-    // Get the appropriate PDF file
-    const pdfPath = isAslab
-      ? '/src/assets/sertifikat-aslab/All Sertifikat Aslab RPL.PBO.X.pdf'
-      : '/src/assets/sertifikat-praktikan/All Sertifikat Praktikan RPL.PBO.X.pdf';
-
-    const pdfResponse = await fetch(pdfPath);
-    const pdfBytes = await pdfResponse.arrayBuffer();
-    const pdfDoc = await PDFDocument.load(pdfBytes);
-
-    // Create a new PDF with just the student's page
-    const newPdf = await PDFDocument.create();
-    const [page] = await newPdf.copyPages(pdfDoc, [studentNumber]);
-    newPdf.addPage(page);
-
-    const newPdfBytes = await newPdf.save();
-    return new Blob([newPdfBytes], { type: 'application/pdf' });
+    
+    return await response.blob();
   } catch (error) {
-    console.error('Error getting certificate page:', error);
+    console.error('Error fetching certificate:', error);
     return null;
   }
 }
 
 // Function to get individual certificate URL
 export function getCertificateUrl(npm: string, isAslab: boolean): string {
-  if (isAslab) {
-    return `/src/assets/sertifikat-aslab/Sertifikat_Aslab_${npm}.pdf`;
-  }
-  return `/src/assets/sertifikat-praktikan/Sertifikat_${npm}.pdf`;
+  return isAslab 
+    ? PDF_PATHS.INDIVIDUAL.ASLAB(npm)
+    : PDF_PATHS.INDIVIDUAL.PRAKTIKAN(npm);
 } 
