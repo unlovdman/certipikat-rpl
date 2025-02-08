@@ -1,15 +1,19 @@
 // Function to clear and redirect
 const clearAndReload = () => {
-  document.documentElement.innerHTML = '';
-  window.location.href = '/';
+  // Only clear and reload in production
+  if (process.env.NODE_ENV === 'production') {
+    document.documentElement.innerHTML = '';
+    window.location.href = '/';
+  }
 };
 
 // Prevent right-click context menu
 const disableContextMenu = () => {
   document.addEventListener('contextmenu', (e) => {
-    e.preventDefault();
-    window.location.reload();
-    return false;
+    if (process.env.NODE_ENV === 'production') {
+      e.preventDefault();
+      return false;
+    }
   }, { capture: true });
 };
 
@@ -17,35 +21,39 @@ const disableContextMenu = () => {
 const disableDevTools = () => {
   let intervalId: any;
   let isDevToolsOpen = false;
+  let warningCount = 0;
+  const MAX_WARNINGS = 3;
 
   // Aggressive detection and prevention
   const aggressive = () => {
     // Check if dev tools is open
     const checkDevTools = () => {
-      const isFF = /Firefox/i.test(navigator.userAgent);
-      const isOpera = /Opera/i.test(navigator.userAgent);
+      if (process.env.NODE_ENV !== 'production') return;
+
       const widthThreshold = window.outerWidth - window.innerWidth > 100;
       const heightThreshold = window.outerHeight - window.innerHeight > 100;
 
-      if (
-        widthThreshold ||
-        heightThreshold ||
-        isFF ||
-        isOpera
-      ) {
+      if (widthThreshold || heightThreshold) {
         if (!isDevToolsOpen) {
           isDevToolsOpen = true;
-          clearAndReload();
+          warningCount++;
+          if (warningCount >= MAX_WARNINGS) {
+            clearAndReload();
+          }
         }
+      } else {
+        isDevToolsOpen = false;
       }
     };
 
-    // Run checks frequently
+    // Run checks less frequently
     if (intervalId) clearInterval(intervalId);
-    intervalId = setInterval(checkDevTools, 100);
+    intervalId = setInterval(checkDevTools, 1000);
 
     // Prevent common dev tools shortcuts
     document.addEventListener('keydown', (e) => {
+      if (process.env.NODE_ENV !== 'production') return;
+
       const ctrlKey = e.ctrlKey || e.metaKey;
       const shiftKey = e.shiftKey;
       const altKey = e.altKey;
@@ -66,84 +74,58 @@ const disableDevTools = () => {
       ) {
         e.preventDefault();
         e.stopPropagation();
-        clearAndReload();
+        warningCount++;
+        if (warningCount >= MAX_WARNINGS) {
+          clearAndReload();
+        }
         return false;
       }
     }, { capture: true });
 
     // Override properties that dev tools may use
-    const overrideProp = (obj: any, prop: string, value: any) => {
-      try {
-        Object.defineProperty(obj, prop, {
-          get: () => value,
-          set: () => {},
-          configurable: false
-        });
-      } catch (e) {}
-    };
+    if (process.env.NODE_ENV === 'production') {
+      const overrideProp = (obj: any, prop: string, value: any) => {
+        try {
+          Object.defineProperty(obj, prop, {
+            get: () => value,
+            set: () => {},
+            configurable: false
+          });
+        } catch (e) {}
+      };
 
-    // Disable console completely
-    overrideProp(window, 'console', {
-      log: () => clearAndReload(),
-      info: () => clearAndReload(),
-      warn: () => clearAndReload(),
-      error: () => clearAndReload(),
-      debug: () => clearAndReload(),
-      clear: () => clearAndReload(),
-    });
-
-    // Disable debugging functions
-    overrideProp(window, 'debug', () => clearAndReload());
-    overrideProp(window, 'debugger', () => clearAndReload());
-
-    // Additional protection
-    (() => {
-      function detectDevTools() {
-        const d = new Date();
-        debugger;
-        const dur = new Date().getTime() - d.getTime();
-        if (dur > 100) {
-          clearAndReload();
-        }
-      }
-
-      setInterval(detectDevTools, 100);
-
-      const element = new Image();
-      Object.defineProperty(element, 'id', {
-        get: function() {
-          clearAndReload();
-        }
+      // Disable console completely in production
+      overrideProp(window, 'console', {
+        log: () => {},
+        info: () => {},
+        warn: () => {},
+        error: () => {},
+        debug: () => {},
+        clear: () => {},
       });
-      console.log(element);
-    })();
-
-    // Prevent source view
-    document.addEventListener('keypress', (e) => {
-      if (e.ctrlKey && (e.key === 'u' || e.key === 'U')) {
-        clearAndReload();
-      }
-    }, { capture: true });
+    }
   };
 
   // Start aggressive protection
   aggressive();
-
-  // Additional layer of protection using debugger
-  setInterval(() => {
-    Function("debugger")();
-  }, 50);
 };
 
 // Clear console and prevent console access
 const disableConsole = () => {
+  if (process.env.NODE_ENV !== 'production') return;
+
   const clearConsole = () => {
     try {
       window.console.clear();
       Object.defineProperty(window, 'console', {
         get: function() {
-          clearAndReload();
-          return {};
+          return {
+            log: () => {},
+            info: () => {},
+            warn: () => {},
+            error: () => {},
+            debug: () => {},
+          };
         },
         set: function() {},
         configurable: false
@@ -152,11 +134,12 @@ const disableConsole = () => {
   };
 
   clearConsole();
-  setInterval(clearConsole, 100);
 };
 
 // Initialize all security measures
 export const initSecurity = () => {
+  if (process.env.NODE_ENV !== 'production') return;
+
   // Disable right click
   disableContextMenu();
 
@@ -182,15 +165,6 @@ export const initSecurity = () => {
   document.addEventListener('paste', (e) => {
     e.preventDefault();
     return false;
-  }, { capture: true });
-
-  // Disable source view
-  document.addEventListener('keydown', (e) => {
-    if (e.ctrlKey && (e.key === 'u' || e.key === 'U')) {
-      e.preventDefault();
-      clearAndReload();
-      return false;
-    }
   }, { capture: true });
 
   // Initialize core protections
@@ -222,7 +196,6 @@ export const initSecurity = () => {
     // Disable drag and drop
     document.addEventListener('dragstart', (e) => {
       e.preventDefault();
-      clearAndReload();
       return false;
     }, { capture: true });
 
@@ -230,7 +203,6 @@ export const initSecurity = () => {
     document.addEventListener('keydown', (e) => {
       if (e.ctrlKey && (e.key === 's' || e.key === 'S')) {
         e.preventDefault();
-        clearAndReload();
         return false;
       }
     }, { capture: true });
