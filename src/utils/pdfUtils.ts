@@ -91,7 +91,7 @@ export async function getCertificatePage(npm: string, isAslab: boolean): Promise
     console.log('Student data for certificate:', studentData);
     
     if (studentData === null) {
-      throw new Error('Student not found in list');
+      throw new Error('Data mahasiswa tidak ditemukan');
     }
 
     // Get the appropriate PDF file
@@ -100,41 +100,70 @@ export async function getCertificatePage(npm: string, isAslab: boolean): Promise
       : '/data/cert/c3rt_p.pdf';
 
     console.log('Attempting to fetch PDF from:', pdfPath);
-    const pdfResponse = await fetch(pdfPath);
+    const pdfResponse = await fetch(pdfPath, {
+      cache: 'no-cache', // Disable caching to ensure fresh content
+      headers: {
+        'Accept': 'application/pdf'
+      }
+    });
+    
     if (!pdfResponse.ok) {
-      throw new Error(`Failed to fetch PDF: ${pdfResponse.statusText} (${pdfResponse.status})`);
+      console.error('PDF fetch failed:', pdfResponse.status, pdfResponse.statusText);
+      throw new Error('Gagal mengambil file sertifikat');
     }
     
-    const pdfBytes = await pdfResponse.arrayBuffer();
-    const pdfDoc = await PDFDocument.load(pdfBytes);
-    
-    const pageCount = pdfDoc.getPageCount();
-    console.log(`Total PDF pages: ${pageCount}`);
-    console.log(`Attempting to get page ${studentData.number} (Student number: ${studentData.number + 1})`);
-
-    if (studentData.number >= pageCount) {
-      throw new Error(`Invalid page number: ${studentData.number}. PDF only has ${pageCount} pages.`);
+    // Check if the response is empty
+    const contentLength = pdfResponse.headers.get('content-length');
+    if (contentLength && parseInt(contentLength) === 0) {
+      throw new Error('File sertifikat kosong');
     }
 
-    // Create a new PDF with just the student's page
-    const newPdf = await PDFDocument.create();
-    const [copiedPage] = await newPdf.copyPages(pdfDoc, [studentData.number]);
-    
-    if (!copiedPage) {
-      throw new Error('Failed to copy page from PDF');
+    try {
+      const pdfBytes = await pdfResponse.arrayBuffer();
+      if (!pdfBytes || pdfBytes.byteLength === 0) {
+        throw new Error('File sertifikat kosong');
+      }
+
+      const pdfDoc = await PDFDocument.load(pdfBytes, { 
+        updateMetadata: false // Optimize loading by skipping metadata
+      });
+      
+      const pageCount = pdfDoc.getPageCount();
+      console.log(`Total PDF pages: ${pageCount}`);
+      console.log(`Attempting to get page ${studentData.number} (Student number: ${studentData.number + 1})`);
+
+      if (studentData.number >= pageCount) {
+        throw new Error(`Halaman sertifikat tidak valid (${studentData.number + 1})`);
+      }
+
+      // Create a new PDF with just the student's page
+      const newPdf = await PDFDocument.create();
+      const [copiedPage] = await newPdf.copyPages(pdfDoc, [studentData.number]);
+      
+      if (!copiedPage) {
+        throw new Error('Gagal menyalin halaman sertifikat');
+      }
+      
+      newPdf.addPage(copiedPage);
+      
+      // Save with compression for smaller file size
+      const newPdfBytes = await newPdf.save({
+        useObjectStreams: true,
+        addDefaultPage: false,
+        objectsPerTick: 50 // Process fewer objects per tick for better memory usage
+      });
+      
+      const blob = new Blob([newPdfBytes], { type: 'application/pdf' });
+      
+      // Generate filename with the new format
+      const filename = `Sertifikat PBO_X - ${studentData.name} - ${npm}.pdf`;
+      console.log('Generated filename:', filename);
+      
+      return { blob, filename };
+    } catch (pdfError) {
+      console.error('PDF processing error:', pdfError);
+      throw new Error('Gagal memproses sertifikat');
     }
-    
-    newPdf.addPage(copiedPage);
-    
-    // Save the new PDF with just one page
-    const newPdfBytes = await newPdf.save();
-    const blob = new Blob([newPdfBytes], { type: 'application/pdf' });
-    
-    // Generate filename with the new format
-    const filename = `Sertifikat PBO_X - ${studentData.name} - ${npm}.pdf`;
-    console.log('Generated filename:', filename);
-    
-    return { blob, filename };
   } catch (error) {
     console.error('Detailed error in getCertificatePage:', error);
     if (error instanceof Error) {

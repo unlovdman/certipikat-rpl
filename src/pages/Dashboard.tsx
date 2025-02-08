@@ -121,21 +121,43 @@ export default function Dashboard() {
       setDownloading(true);
       setError('');
       
+      // Show loading message for mobile
+      if (/Mobi|Android/i.test(navigator.userAgent)) {
+        setError('Mohon tunggu, sedang memproses sertifikat...');
+      }
+      
       const result = await getCertificatePage(studentInfo.npm, studentInfo.isAslab);
       
       if (!result.blob) {
         throw new Error('Sertifikat tidak ditemukan');
       }
       
+      // Clear the loading message
+      setError('');
+      
+      // Create object URL
       const url = window.URL.createObjectURL(result.blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', result.filename);
-      link.setAttribute('type', 'application/pdf');
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      
+      // Different handling for mobile
+      if (/Mobi|Android/i.test(navigator.userAgent)) {
+        // For mobile, open in new tab
+        window.open(url, '_blank');
+        
+        // Clean up after a delay
+        setTimeout(() => {
+          window.URL.revokeObjectURL(url);
+        }, 1000);
+      } else {
+        // Desktop download handling
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', result.filename);
+        link.setAttribute('type', 'application/pdf');
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+      }
     } catch (err) {
       console.error('Download error:', err);
       if (err instanceof Error) {
