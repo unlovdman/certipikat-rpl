@@ -170,7 +170,7 @@ export default function Login() {
                     textAlign: 'center',
                   }}
                 >
-                  Login Sertifikat Laboratorium
+                  {/* Login dulu bang  */}
                 </Typography>
                 
                 <Box 
